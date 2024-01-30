@@ -1,83 +1,74 @@
-// StockChecker.tsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Line } from "react-chartjs-2";
-
-interface StockData {
-  symbol: string;
-  companyName: string;
-  open: number;
-  high: number;
-  low: number;
-  current: number;
-}
+import { getValues } from "../utils/getValues";
+import PlotlyDiagram from "./PlotlyDiagram";
+import StockData from "./StockData";
+import { StockDataType, SymbolType } from "../types";
 
 const StockChecker: React.FC = () => {
   const [symbol, setSymbol] = useState<string>("");
-  const [stockData, setStockData] = useState<StockData | null>(null);
+  const [isValidSymbol, setIsValidSymbol] = useState<boolean>(false);
+  const [stockData, setStockData] = useState<StockDataType | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [chartData, setChartData] = useState<{
-    labels: string[];
-    data: number[];
-  }>({
-    labels: [],
-    data: [],
-  });
+  const [companySymbol, setCompanySymbol] = useState<string>("");
+  const [companyName, setCompanyName] = useState<string>("");
+  const [diagramData, setDiagramData] = useState<number[]>([]);
+  const [isLoading, setLoading] = useState<boolean>(false);
 
-  const apiKey = "cmogc31r01qjn677usf0cmogc31r01qjn677usfg"; // Replace with your API key
+  const apiKey = "cmogc31r01qjn677usf0cmogc31r01qjn677usfg";
 
   const validateSymbol = async (symbol: string) => {
     try {
+      setLoading(true);
       const response = await axios.get(
         `https://finnhub.io/api/v1/stock/symbol?exchange=US&token=${apiKey}`
       );
-      const validSymbols = response.data.map((item: any) => item.symbol);
+
+      const validSymbols = response.data.map((item: SymbolType) => item.symbol);
       if (!validSymbols.includes(symbol)) {
         setErrorMessage(
           "Invalid stock symbol. Please enter a valid US stock ticker."
         );
+        setIsValidSymbol(false);
       } else {
         setErrorMessage(null);
+        const selectedSymbol = response.data.find(
+          (sym: SymbolType) => sym.symbol === symbol
+        );
+        setCompanyName(selectedSymbol.description);
+        setCompanySymbol(symbol);
+        setIsValidSymbol(true);
       }
     } catch (error) {
-      setErrorMessage(`Error validating symbol: ${error.message}`);
+      setErrorMessage("Error validating symbol");
+      setIsValidSymbol(false);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       const response = await axios.get(
         `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`
       );
-      //   const historicalDataResponse = await axios.get(
-      //     `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${Math.floor(
-      //       new Date().getTime() / 1000 - 365 * 24 * 60 * 60
-      //     )}&to=${Math.floor(new Date().getTime() / 1000)}&token=${apiKey}`
-      //   );
 
-      const latestData = response.data;
-      //   const historicalData = historicalDataResponse.data;
-
+      const { o, h, l, c } = response.data;
       setStockData({
-        symbol: latestData.symbol,
-        companyName: latestData.name,
-        open: latestData.o,
-        high: latestData.h,
-        low: latestData.l,
-        current: latestData.c,
+        symbol: companySymbol,
+        name: companyName,
+        open: o,
+        high: h,
+        low: l,
+        current: c,
       });
 
-      //   const labels = historicalData.t.map((timestamp: number) =>
-      //     new Date(timestamp * 1000).toLocaleDateString()
-      //   );
-      //   const data = historicalData.c;
-
-      //   setChartData({
-      //     labels,
-      //     data,
-      //   });
+      setDiagramData(getValues(Math.random() * 100, 0.05, 365));
     } catch (error) {
-      setErrorMessage(`Error fetching data: ${error.message}`);
+      setErrorMessage("Error fetching data");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,54 +78,52 @@ const StockChecker: React.FC = () => {
     }
   }, [symbol]);
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoading && symbol && isValidSymbol) {
+      fetchData();
+    }
+  };
+
   return (
-    <div>
-      <h1>US Stock Checker</h1>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          fetchData();
-        }}
-      >
-        <label>
-          Enter Stock Symbol:
-          <input
-            type="text"
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
-            required
-          />
-        </label>
-        <button type="submit">Check Stock</button>
-      </form>
-      {errorMessage && <p>{errorMessage}</p>}
-      {stockData && (
-        <div>
-          <h2>Stock Information</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Company Name</th>
-                <th>Opening Price</th>
-                <th>High Price</th>
-                <th>Low Price</th>
-                <th>Current Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>{stockData.symbol}</td>
-                <td>{stockData.companyName}</td>
-                <td>{stockData.open}</td>
-                <td>{stockData.high}</td>
-                <td>{stockData.low}</td>
-                <td>{stockData.current}</td>
-              </tr>
-            </tbody>
-          </table>
+    <div className="p-4 flex w-full flex-wrap md:flex-nowrap gap-2 bg-white text-gray-700">
+      <div className="w-full md:w-1/2">
+        <h1 className="text-3xl font-bold mb-8">US Stock Checker</h1>
+        <form onSubmit={handleSubmit} className="max-w-md">
+          <div className="flex items-center border-b border-b-2 border-blue-500 py-2">
+            <input
+              type="text"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+              placeholder="Enter Stock Symbol"
+              className="appearance-none bg-transparent border-none w-full mr-3 py-1 px-2 leading-tight focus:outline-none"
+            />
+            <button
+              disabled={isLoading || !symbol || !isValidSymbol}
+              type="submit"
+              className={`flex-shrink-0 bg-blue-500 hover:bg-blue-700 text-sm border-none text-white py-1 px-2 rounded ${
+                isLoading || !symbol || !isValidSymbol
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
+              }`}
+            >
+              {isLoading ? "Loading..." : "Check Stock"}
+            </button>
+          </div>
+        </form>
+        <div className="mt-4">
+          {symbol && (
+            <p className={errorMessage ? "text-red-500" : "text-green-500"}>
+              {errorMessage ||
+                `${symbol} is a valid ticker symbol. Press the check button to fetch more data!`}
+            </p>
+          )}
         </div>
-      )}
+        {stockData && isValidSymbol && <StockData data={stockData} />}
+      </div>
+      <div className="w-full md:w-1/2">
+        {stockData && isValidSymbol && <PlotlyDiagram data={diagramData} />}
+      </div>
     </div>
   );
 };
