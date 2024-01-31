@@ -5,6 +5,12 @@ import PlotlyDiagram from "./PlotlyDiagram";
 import StockData from "./StockData";
 import { StockDataType, SymbolType } from "../types";
 
+const API_BASE_URL = "https://finnhub.io/api/v1";
+const API_KEY = "cmogc31r01qjn677usf0cmogc31r01qjn677usfg";
+
+const getApiUrl = (endpoint: string) =>
+  `${API_BASE_URL}/${endpoint}&token=${API_KEY}`;
+
 const StockChecker: React.FC = () => {
   const [symbol, setSymbol] = useState<string>("");
   const [isValidSymbol, setIsValidSymbol] = useState<boolean>(false);
@@ -15,14 +21,10 @@ const StockChecker: React.FC = () => {
   const [diagramData, setDiagramData] = useState<number[]>([]);
   const [isLoading, setLoading] = useState<boolean>(false);
 
-  const apiKey = "cmogc31r01qjn677usf0cmogc31r01qjn677usfg";
-
   const validateSymbol = async (symbol: string) => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `https://finnhub.io/api/v1/stock/symbol?exchange=US&token=${apiKey}`
-      );
+      const response = await axios.get(getApiUrl("stock/symbol?exchange=US"));
 
       const validSymbols = response.data.map((item: SymbolType) => item.symbol);
       if (!validSymbols.includes(symbol)) {
@@ -50,9 +52,7 @@ const StockChecker: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`
-      );
+      const response = await axios.get(getApiUrl(`quote?symbol=${symbol}`));
 
       const { o, h, l, c } = response.data;
       setStockData({
